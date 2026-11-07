@@ -681,7 +681,8 @@ namespace xtream
 Settings LoadSettings()
 {
   Settings s;
-  const bool haveServer = kodi::addon::GetSettingString("server", s.server);
+  s.server = kodi::addon::GetSettingString("server");
+  const bool haveServer = !s.server.empty();
   int kodiPort = 0;
   const bool havePort = kodi::addon::GetSettingInt("port", kodiPort);
   if (havePort && kodiPort > 0 && kodiPort <= 65535)
@@ -689,11 +690,14 @@ Settings LoadSettings()
   else
     s.port = 0; // Distinguish a missing Kodi value from the struct's default port.
 
-  const bool haveUsername = kodi::addon::GetSettingString("username", s.username);
-  const bool havePassword = kodi::addon::GetSettingString("password", s.password);
+  s.username = kodi::addon::GetSettingString("username");
+  const bool haveUsername = !s.username.empty();
+  s.password = kodi::addon::GetSettingString("password");
+  const bool havePassword = !s.password.empty();
   const bool haveTimeout = kodi::addon::GetSettingInt("timeout_seconds", s.timeoutSeconds);
   const bool haveSpoofing = kodi::addon::GetSettingBoolean("enable_user_agent_spoofing", s.enableUserAgentSpoofing);
-  const bool haveCustomUserAgent = kodi::addon::GetSettingString("custom_user_agent", s.customUserAgent);
+  s.customUserAgent = kodi::addon::GetSettingString("custom_user_agent");
+  const bool haveCustomUserAgent = !s.customUserAgent.empty();
 
   // Read the persisted settings independently of the credential fallback. Kodi may
   // provide server/user values while the port is still unavailable to the binary addon.
