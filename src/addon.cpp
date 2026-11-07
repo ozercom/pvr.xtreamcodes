@@ -336,6 +336,7 @@ public:
     : CInstancePVRClient(instance)
   {
     kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: instance created");
+    AddMenuHook(kodi::addon::PVRMenuhook(1, 30020, PVR_MENUHOOK_SETTING));
     StartBootstrapThread();
   }
 
@@ -399,8 +400,23 @@ public:
 
   void RequestReloadNow()
   {
-    // Schedules (but does not block on) a background reload immediately.
+    // Explicit user refresh bypasses the cache and fetches a fresh channel list.
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      m_forceRefreshRequested = true;
+      m_dataLoaded = false;
+      m_loading = false;
+    }
     EnsureLoaded();
+  }
+
+  PVR_ERROR CallSettingsMenuHook(const kodi::addon::PVRMenuhook& menuhook) override
+  {
+    if (menuhook.GetHookId() != 1)
+      return PVR_ERROR_NOT_IMPLEMENTED;
+    RequestReloadNow();
+    kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, "Manual channel refresh started");
+    return PVR_ERROR_NO_ERROR;
   }
 
   PVR_ERROR GetBackendName(std::string& name) override
@@ -846,7 +862,8 @@ private:
           {
             std::lock_guard<std::mutex> lock(m_mutex);
             m_loading = false;
-            m_dataLoaded = false;
+            m_dataLoaded = m_channels && !m_channels->empty();
+            m_groupsReady = m_dataLoaded && m_groupNamesOrdered && !m_groupNamesOrdered->empty();
             m_workRequested = false;
           }
           kodi::Log(ADDON_LOG_ERROR, "pvr.xtreamcodes: failed to load Xtream categories (%s)", catsRes.details.c_str());
@@ -866,7 +883,8 @@ private:
           {
             std::lock_guard<std::mutex> lock(m_mutex);
             m_loading = false;
-            m_dataLoaded = false;
+            m_dataLoaded = m_channels && !m_channels->empty();
+            m_groupsReady = m_dataLoaded && m_groupNamesOrdered && !m_groupNamesOrdered->empty();
             m_workRequested = false;
           }
           kodi::Log(ADDON_LOG_ERROR, "pvr.xtreamcodes: failed to load Xtream streams (%s)", details.c_str());
@@ -1326,10 +1344,40 @@ private:
                 ToLower(categoryFilterMode) + "|catflt=" + HashHex(categoryFilterRaw) + "|sep=" +
                 (filterChannelSeparators ? "1" : "0");
 
+    bool forceRefresh = false;
+    {
+      std::lock_guard<std::mutex> lock(m_mutex);
+      forceRefresh = m_forceRefreshRequested;
+      m_forceRefreshRequested = false;
+    }
+
+    bool loadedFromCache = false;
     if (m_cacheSignatureAttempted != sig)
     {
       m_cacheSignatureAttempted = sig;
-      (void)TryLoadCacheForSignature(sig);
+      if (!forceRefresh)
+        loadedFromCache = TryLoadCacheForSignature(sig);
+    }
+
+    if (loadedFromCache && !forceRefresh)
+    {
+      {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_settingsSignature = sig;
+        m_xtreamSettings = xt;
+        m_streamFormat = ToLower(streamFormat);
+        m_channelNumbering = ToLower(channelNumbering);
+        m_filterPatternsRaw = filterRaw;
+        m_categoryFilterMode = ToLower(categoryFilterMode);
+        m_categoryFilterPatternsRaw = categoryFilterRaw;
+        m_filterChannelSeparators = filterChannelSeparators;
+        m_loading = false;
+        m_dataLoaded = true;
+        m_groupsReady = true;
+      }
+      kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: startup served from cache; provider list request skipped");
+      TriggerKodiRefreshThrottled();
+      return;
     }
 
     bool shouldStart = false;
@@ -1343,7 +1391,9 @@ private:
       m_settingsSignature = sig;
       m_loading = true;
       m_dataLoaded = false;
-      m_groupsReady = false;
+      // Keep the existing group snapshot available while an explicit refresh runs.
+      if (!m_channels || m_channels->empty())
+        m_groupsReady = false;
 
       m_xtreamSettings = std::move(xt);
       m_streamFormat = ToLower(streamFormat);
@@ -1376,6 +1426,7 @@ private:
   bool m_workRequested = false;
   bool m_loading = false;
   bool m_dataLoaded = false;
+  bool m_forceRefreshRequested = false;
   bool m_groupsReady = false;
   std::string m_settingsSignature;
   bool m_hasSettingsOverride = false;
