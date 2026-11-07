@@ -1,4 +1,4 @@
-name: Custom Kodi 21.2 Android ARMv7 build
+name: Kodi 21.2 Android ARMv7 with bundled Xtream Codes
 
 on:
   workflow_dispatch:
@@ -10,113 +10,105 @@ permissions:
   contents: read
 
 jobs:
-  build-kodi:
+  build-addon-and-package:
     runs-on: ubuntu-22.04
-    timeout-minutes: 350
+    timeout-minutes: 45
     steps:
-      - name: Checkout Xtream Codes addon and patch
+      - name: Checkout Xtream Codes addon
         uses: actions/checkout@v4
         with:
           ref: kodi-21.2-no-epg-scan-fix
 
-      - name: Install host dependencies
+      - name: Install host tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y autoconf automake autopoint build-essential bison curl flex gawk gcc g++ gperf lib32stdc++6 lib32z1 lib32z1-dev libcurl4-openssl-dev libtool make nasm pkg-config unzip zip
+          sudo apt-get install -y cmake curl git unzip zip
 
-      - name: Set up Java
+      - name: Set up Java for APK signing
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK and NDK
+      - name: Install Android SDK build tools and NDK
         uses: android-actions/setup-android@v3
         with:
-          # Avoid setup-android@v3's obsolete default 'tools' package.
           packages: ''
       - name: Install SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;33.0.1" "ndk;21.4.7075529"
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;35.0.0" "ndk;21.4.7075529"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_NDK=$ANDROID_HOME/ndk/21.4.7075529" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/build-tools/35.0.0" >> "$GITHUB_PATH"
 
-      - name: Fetch Kodi 21.2 source and apply focused EPG fix
+      - name: Fetch only Kodi 21.2 addon SDK headers
         run: |
-          git clone --depth 1 --branch 21.2-Omega https://github.com/xbmc/xbmc.git "$HOME/kodi"
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          p = Path.home() / "kodi/xbmc/pvr/epg/Epg.cpp"
-          s = p.read_text()
-          pattern = re.compile(
-              r'(      if \(!client->GetClientCapabilities\(\)\.SupportsEPG\(\)\)\n'
-              r'      \{\n)'
-              r'        CLog::LogF\(LOGERROR, "The backend for channel .*?\n'
-              r'                   m_channelData->ChannelName\(\), m_channelData->ClientId\(\)\);\n'
-              r'      \}',
-              re.DOTALL
-          )
-          replacement = (
-              r'\1'
-              '        CLog::LogF(LOGDEBUG, "Skipping EPG update: backend does not support EPGs");\n'
-              '        // Unsupported EPG is a successful no-op for this channel.\n'
-              '        return true;\n'
-              '      }'
-          )
-          s, count = pattern.subn(lambda _: replacement, s, count=1)
-          if count != 1:
-              raise SystemExit("Kodi 21.2 EPG capability block did not match; refusing an unsafe patch.")
-          p.write_text(s)
-          PY
+          git clone --depth 1 --filter=blob:none --sparse --branch 21.2-Omega https://github.com/xbmc/xbmc.git "$HOME/kodi-sdk"
+          git -C "$HOME/kodi-sdk" sparse-checkout set xbmc/addons/kodi-dev-kit
+          test -f "$HOME/kodi-sdk/xbmc/addons/kodi-dev-kit/include/kodi/addon-instance/PVR.h"
 
-      - name: Build Kodi Android dependencies (ARMv7)
+      - name: Build Xtream Codes 1.1.7 for Android ARMv7
+        env:
+          KODI_ADDON_SDK: ${{ github.workspace }}/../kodi-sdk/xbmc/addons/kodi-dev-kit
+          CMAKE_EXTRA_ARGS: -DCMAKE_TOOLCHAIN_FILE=/home/runner/Android/Sdk/ndk/21.4.7075529/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-21 -DANDROID_STL=c++_shared
         run: |
-          mkdir -p "$HOME/android-tools/xbmc-tarballs" "$HOME/android-tools/xbmc-depends"
-          cd "$HOME/kodi/tools/depends"
-          ./bootstrap
-          ./configure --with-tarballs="$HOME/android-tools/xbmc-tarballs" --host=arm-linux-androideabi --with-sdk-path="$ANDROID_HOME" --with-ndk-path="$ANDROID_NDK" --prefix="$HOME/android-tools/xbmc-depends"
-          make -j2
-
-      - name: Configure Kodi
-        run: |
-          cd "$HOME/kodi"
-          make -C tools/depends/target/cmakebuildsys BUILD_DIR="$HOME/kodi-build"
-
-      - name: Build Xtream Codes binary addon for Android ARMv7
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          export KODI_ADDON_SDK="$HOME/kodi/xbmc/addons/kodi-dev-kit"
-          export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-21"
+          export KODI_ADDON_SDK="$HOME/kodi-sdk/xbmc/addons/kodi-dev-kit"
+          export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-21 -DANDROID_STL=c++_shared"
           PLATFORM_SUFFIX=android-armeabi-v7a ./build.sh --skip-zip
-          mkdir -p "$HOME/android-tools/xbmc-depends/share/kodi/addons"
-          cp -a dist/pvr.xtreamcodes "$HOME/android-tools/xbmc-depends/share/kodi/addons/"
+          test -s dist/pvr.xtreamcodes/pvr.xtreamcodes.android.so
+          grep -q 'version="1.1.7"' dist/pvr.xtreamcodes/addon.xml
 
-      - name: Build Kodi and package APK
+      - name: Download official Kodi 21.2 ARMv7 APK
         run: |
-          cd "$HOME/kodi-build"
-          make -j2
-          make apk
-          APK="$(find "$HOME/kodi" "$HOME/kodi-build" -type f -name '*.apk' -print -quit)"
-          test -n "$APK"
-          mkdir -p "$GITHUB_WORKSPACE/out"
-          cp "$APK" "$GITHUB_WORKSPACE/out/Kodi-21.2-Ozer-ARMv7-unsigned.apk"
-          GRADLE_FILE="$HOME/kodi-build/tools/android/packaging/xbmc/build.gradle"
-          if [ -f "$GRADLE_FILE" ]; then
-            sed -i 's/applicationId "org.xbmc.kodi"/applicationId "org.ozer.kodi"/' "$GRADLE_FILE"
-            (cd "$HOME/kodi-build/tools/android/packaging" && ./gradlew assembleDebug)
-            DEBUG_APK="$(find "$HOME/kodi-build/tools/android/packaging" -type f -path '*/build/outputs/apk/*/*.apk' -print -quit)"
-            test -n "$DEBUG_APK"
-            cp "$DEBUG_APK" "$GITHUB_WORKSPACE/out/Kodi-21.2-Ozer-ARMv7.apk"
-          fi
+          curl --fail --location --retry 3 --retry-delay 2 \
+            "https://mirrors.kodi.tv/releases/android/arm/kodi-21.2-Omega-armeabi-v7a.apk?https=1" \
+            --output "$RUNNER_TEMP/kodi-base.apk"
+          unzip -Z1 "$RUNNER_TEMP/kodi-base.apk" > "$RUNNER_TEMP/apk-files.txt"
+          grep -q '^assets/addons/' "$RUNNER_TEMP/apk-files.txt"
+          grep -q '^lib/armeabi-v7a/libc++_shared.so$' "$RUNNER_TEMP/apk-files.txt"
 
-      - name: Upload APK artifact
+      - name: Bundle addon into Kodi APK and sign
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/kodi-apk"
+          mkdir -p "$WORK"
+          unzip -q "$RUNNER_TEMP/kodi-base.apk" -d "$WORK"
+
+          mkdir -p "$WORK/assets/addons/pvr.xtreamcodes" "$WORK/lib/armeabi-v7a"
+          cp -a dist/pvr.xtreamcodes/. "$WORK/assets/addons/pvr.xtreamcodes/"
+          install -m 755 dist/pvr.xtreamcodes/pvr.xtreamcodes.android.so \
+            "$WORK/lib/armeabi-v7a/libpvr.xtreamcodes.android.so"
+
+          # Remove the original APK's v1 signature before rebuilding the archive.
+          rm -rf "$WORK/META-INF"
+          mkdir -p out
+          (cd "$WORK" && zip -q -r "$RUNNER_TEMP/Kodi-21.2-Ozer-ARMv7-unsigned.apk" .)
+          zipalign -f -p 4 "$RUNNER_TEMP/Kodi-21.2-Ozer-ARMv7-unsigned.apk" \
+            "$RUNNER_TEMP/Kodi-21.2-Ozer-ARMv7-aligned.apk"
+
+          keytool -genkeypair -keystore "$RUNNER_TEMP/ozer-debug.keystore" \
+            -storepass android -keypass android -alias androiddebugkey \
+            -dname "CN=Ozer Kodi Build,O=Ozer,C=TR" -keyalg RSA -keysize 2048 -validity 10000
+
+          apksigner sign --ks "$RUNNER_TEMP/ozer-debug.keystore" \
+            --ks-pass pass:android --key-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            --out out/Kodi-21.2-Ozer-ARMv7.apk \
+            "$RUNNER_TEMP/Kodi-21.2-Ozer-ARMv7-aligned.apk"
+          apksigner verify --verbose out/Kodi-21.2-Ozer-ARMv7.apk
+
+          unzip -Z1 out/Kodi-21.2-Ozer-ARMv7.apk | grep -q '^assets/addons/pvr.xtreamcodes/addon.xml$'
+          unzip -Z1 out/Kodi-21.2-Ozer-ARMv7.apk | grep -q '^lib/armeabi-v7a/libpvr.xtreamcodes.android.so$'
+
+          (cd dist && zip -qr "$GITHUB_WORKSPACE/out/pvr.xtreamcodes-1.1.7-android-armeabi-v7a.zip" pvr.xtreamcodes)
+
+      - name: Upload APK and addon ZIP
         uses: actions/upload-artifact@v4
         with:
           name: Kodi-21.2-Ozer-ARMv7
-          path: out/*.apk
+          path: |
+            out/Kodi-21.2-Ozer-ARMv7.apk
+            out/pvr.xtreamcodes-1.1.7-android-armeabi-v7a.zip
           if-no-files-found: error
           retention-days: 14
-
-# Trigger rebuild after repository Actions permissions were enabled.
