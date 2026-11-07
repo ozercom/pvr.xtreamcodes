@@ -7,7 +7,7 @@ endif()
 
 set(ADDON_ID "pvr.xtreamcodes")
 set(ADDON_NAME "Xtream Codes PVR Client")
-set(ADDON_VERSION "1.1.3")
+set(ADDON_VERSION "1.1.4")
 
 # Try to use Kodi's official addon build system when available.
 find_package(Kodi QUIET)
