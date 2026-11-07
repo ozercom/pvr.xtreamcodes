@@ -46,18 +46,28 @@ jobs:
           git clone --depth 1 --branch 21.2-Omega https://github.com/xbmc/xbmc.git "$HOME/kodi"
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path.home() / "kodi/xbmc/pvr/epg/Epg.cpp"
           s = p.read_text()
-          old = '''        CLog::LogF(LOGERROR, "The backend for channel '{}' on client '{}' does not support EPGs",
-                   m_channelData->ChannelName(), m_channelData->ClientId());'''
-          new = '''        CLog::LogF(LOGDEBUG, "Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs",
-                   m_channelData->ChannelName(), m_channelData->ClientId());
-                  // Unsupported EPG is a successful no-op: do not keep failing a scan
-                  // for every channel of a backend that intentionally has no EPG support.
-                  return true;'''
-          if old not in s:
-              raise SystemExit("Expected Kodi 21.2 EPG code was not found; refusing an unsafe patch.")
-          p.write_text(s.replace(old, new, 1))
+          pattern = re.compile(
+              r'(      if \(!client->GetClientCapabilities\(\)\.SupportsEPG\(\)\)\n'
+              r'      \{\n)'
+              r'        CLog::LogF\(LOGERROR, "The backend for channel .*?\n'
+              r'                   m_channelData\(\)->ChannelName\(\), m_channelData\(\)->ClientId\(\)\);\n'
+              r'      \}',
+              re.DOTALL
+          )
+          replacement = (
+              r'\1'
+              '        CLog::LogF(LOGDEBUG, "Skipping EPG update: backend does not support EPGs");\n'
+              '        // Unsupported EPG is a successful no-op for this channel.\n'
+              '        return true;\n'
+              '      }'
+          )
+          s, count = pattern.subn(lambda _: replacement, s, count=1)
+          if count != 1:
+              raise SystemExit("Kodi 21.2 EPG capability block did not match; refusing an unsafe patch.")
+          p.write_text(s)
           PY
 
       - name: Build Kodi Android dependencies (ARMv7)
