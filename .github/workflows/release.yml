@@ -1,6 +1,8 @@
 name: Release Zips
 
 on:
+  push:
+    branches: [master]
   pull_request:
     branches: [master]
   release:
@@ -223,7 +225,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pvr.xtreamcodes-${{ steps.version.outputs.version }}-android-${{ matrix.abi }}
-          path: dist/*
+          path: dist/pvr.xtreamcodes-*.zip
 
       - name: Publish GitHub Release asset
         if: github.event_name == 'release'
