@@ -1,108 +1,14 @@
 name: Custom Kodi 21.2 Android ARMv7 build
-
 on:
   push:
     branches:
       - kodi-21.2-no-epg-scan-fix
-
 permissions:
   contents: read
-
 jobs:
   build-kodi:
     runs-on: ubuntu-22.04
     timeout-minutes: 350
     steps:
-      - name: Checkout Xtream Codes addon and patch
-        uses: actions/checkout@v4
-        with:
-          ref: kodi-21.2-no-epg-scan-fix
-
-      - name: Install host dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y autoconf automake autopoint build-essential bison curl flex gawk gcc g++ gperf lib32stdc++6 lib32z1 lib32z1-dev libcurl4-openssl-dev libtool make nasm pkg-config unzip zip
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Install Android SDK and NDK
-        uses: android-actions/setup-android@v3
-      - name: Install SDK packages
-        run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;33.0.1" "ndk;21.4.7075529"
-          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK=$ANDROID_HOME/ndk/21.4.7075529" >> "$GITHUB_ENV"
-
-      - name: Fetch Kodi 21.2 source and apply focused EPG fix
-        run: |
-          git clone --depth 1 --branch 21.2-Omega https://github.com/xbmc/xbmc.git "$HOME/kodi"
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path.home() / "kodi/xbmc/pvr/epg/Epg.cpp"
-          s = p.read_text()
-          old = '''        CLog::LogF(LOGERROR, "The backend for channel '{}' on client '{}' does not support EPGs",
-                   m_channelData->ChannelName(), m_channelData->ClientId());'''
-          new = '''        CLog::LogF(LOGDEBUG, "Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs",
-                   m_channelData->ChannelName(), m_channelData->ClientId());
-        // Unsupported EPG is a successful no-op: do not keep failing a scan
-        // for every channel of a backend that intentionally has no EPG support.
-        return true;'''
-          if old not in s:
-              raise SystemExit("Expected Kodi 21.2 EPG code was not found; refusing an unsafe patch.")
-          p.write_text(s.replace(old, new, 1))
-          PY
-
-      - name: Build Kodi Android dependencies (ARMv7)
-        run: |
-          mkdir -p "$HOME/android-tools/xbmc-tarballs" "$HOME/android-tools/xbmc-depends"
-          cd "$HOME/kodi/tools/depends"
-          ./bootstrap
-          ./configure --with-tarballs="$HOME/android-tools/xbmc-tarballs" --host=arm-linux-androideabi --with-sdk-path="$ANDROID_HOME" --with-ndk-path="$ANDROID_NDK" --prefix="$HOME/android-tools/xbmc-depends"
-          make -j2
-
-      - name: Configure Kodi
-        run: |
-          cd "$HOME/kodi"
-          make -C tools/depends/target/cmakebuildsys BUILD_DIR="$HOME/kodi-build"
-
-      - name: Build Xtream Codes binary addon for Android ARMv7
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          export KODI_ADDON_SDK="$HOME/kodi/xbmc/addons/kodi-dev-kit"
-          export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-21"
-          PLATFORM_SUFFIX=android-armeabi-v7a ./build.sh --skip-zip
-          mkdir -p "$HOME/android-tools/xbmc-depends/share/kodi/addons"
-          cp -a dist/pvr.xtreamcodes "$HOME/android-tools/xbmc-depends/share/kodi/addons/"
-
-      - name: Build Kodi and package APK
-        run: |
-          cd "$HOME/kodi-build"
-          make -j2
-          make apk
-          APK="$(find "$HOME/kodi" "$HOME/kodi-build" -type f -name '*.apk' -print -quit)"
-          test -n "$APK"
-          mkdir -p "$GITHUB_WORKSPACE/out"
-          cp "$APK" "$GITHUB_WORKSPACE/out/Kodi-21.2-Ozer-ARMv7-unsigned.apk"
-          GRADLE_FILE="$HOME/kodi-build/tools/android/packaging/xbmc/build.gradle"
-          if [ -f "$GRADLE_FILE" ]; then
-            sed -i 's/applicationId "org.xbmc.kodi"/applicationId "org.ozer.kodi"/' "$GRADLE_FILE"
-            (cd "$HOME/kodi-build/tools/android/packaging" && ./gradlew assembleDebug)
-            DEBUG_APK="$(find "$HOME/kodi-build/tools/android/packaging" -type f -path '*/build/outputs/apk/*/*.apk' -print -quit)"
-            test -n "$DEBUG_APK"
-            cp "$DEBUG_APK" "$GITHUB_WORKSPACE/out/Kodi-21.2-Ozer-ARMv7.apk"
-          fi
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Kodi-21.2-Ozer-ARMv7
-          path: out/*.apk
-          if-no-files-found: error
-          retention-days: 14
-
-# Trigger rebuild after repository Actions permissions were enabled.
+      - name: Runner smoke test
+        run: echo "Kodi build runner is available"
