@@ -675,12 +675,8 @@ private:
     };
     if (accountIdentity(sigOnDisk) != accountIdentity(signature))
     {
-      // Keep the last successful channel snapshot as an offline/startup fallback.
-      // This cache stores channel metadata/IDs, not authenticated stream URLs;
-      // playback URLs are generated using the current account settings.
-      // A manual refresh remains the only operation that replaces this snapshot.
-      kodi::Log(ADDON_LOG_WARNING,
-               "pvr.xtreamcodes: cache account identity differs; retaining last successful channel snapshot");
+      kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: cache account identity does not match current settings");
+      return false;
     }
     if (sigOnDisk != signature)
       kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: using account cache despite changed display/filter preferences");
