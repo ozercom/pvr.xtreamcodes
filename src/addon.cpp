@@ -695,6 +695,11 @@ private:
 
     std::unordered_map<int, std::string> categoryIdToName;
     categoryIdToName.reserve(static_cast<size_t>(catCount));
+    // Keep the exact provider category order from the cache. Do not reconstruct
+    // this list from an unordered_map or sort by category ID: providers often
+    // use IDs that do not reflect the visible category order.
+    std::vector<std::pair<int, std::string>> categoriesInProviderOrder;
+    categoriesInProviderOrder.reserve(static_cast<size_t>(catCount));
     for (uint32_t i = 0; i < catCount; ++i)
     {
       int32_t id = 0;
@@ -704,7 +709,10 @@ private:
       std::string name = blob.substr(off, nameLen);
       off += nameLen;
       if (id > 0 && !name.empty())
-        categoryIdToName.emplace(static_cast<int>(id), std::move(name));
+      {
+        categoryIdToName.emplace(static_cast<int>(id), name);
+        categoriesInProviderOrder.emplace_back(static_cast<int>(id), std::move(name));
+      }
     }
 
     uint32_t chCount = 0;
@@ -758,15 +766,9 @@ private:
       groupMembers[catIt->second].push_back(gm);
     }
 
-    std::vector<std::pair<int, std::string>> cats;
-    cats.reserve(categoryIdToName.size());
-    for (const auto& kv : categoryIdToName)
-      cats.emplace_back(kv.first, kv.second);
-    std::sort(cats.begin(), cats.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
-
     std::vector<std::string> groupNamesOrdered;
-    groupNamesOrdered.reserve(cats.size());
-    for (const auto& kv : cats)
+    groupNamesOrdered.reserve(categoriesInProviderOrder.size());
+    for (const auto& kv : categoriesInProviderOrder)
     {
       const auto memIt = groupMembers.find(kv.second);
       if (memIt == groupMembers.end() || memIt->second.empty())
