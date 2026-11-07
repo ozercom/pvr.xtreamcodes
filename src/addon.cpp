@@ -1397,8 +1397,13 @@ private:
         m_dataLoaded = true;
         m_groupsReady = true;
       }
-      kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: startup served from cache; provider list request skipped");
-      TriggerKodiRefreshThrottled();
+      kodi::Log(ADDON_LOG_INFO,
+                "pvr.xtreamcodes: startup served from cache; provider list request and redundant Kodi refresh skipped");
+      // Kodi is already querying this PVR instance during startup. Triggering
+      // another channel/group update here makes PVR Manager import the same
+      // data a second time and can prolong the "Importing guide from clients"
+      // startup phase. Explicit refresh and successful network loads still
+      // notify Kodi through the worker completion path.
       return;
     }
 
