@@ -54,7 +54,7 @@ jobs:
               r'(      if \(!client->GetClientCapabilities\(\)\.SupportsEPG\(\)\)\n'
               r'      \{\n)'
               r'        CLog::LogF\(LOGERROR, "The backend for channel .*?\n'
-              r'                   m_channelData\(\)->ChannelName\(\), m_channelData\(\)->ClientId\(\)\);\n'
+              r'                   m_channelData->ChannelName\(\), m_channelData->ClientId\(\)\);\n'
               r'      \}',
               re.DOTALL
           )
