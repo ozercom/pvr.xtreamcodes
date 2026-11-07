@@ -1,6 +1,10 @@
 name: Release Zips
 
 on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
   release:
     types: [published]
   workflow_dispatch:
@@ -31,7 +35,7 @@ jobs:
       - name: Fetch Kodi dev kit (headers)
         shell: bash
         run: |
-          git clone --depth 1 --branch 21.3-Omega https://github.com/xbmc/xbmc xbmc
+          git clone --depth 1 --branch 21.2-Omega https://github.com/xbmc/xbmc xbmc
           if [[ ! -f "xbmc/xbmc/addons/kodi-dev-kit/include/kodi/addon-instance/PVR.h" ]]; then
             echo "ERROR: Could not find kodi-dev-kit/include/kodi/addon-instance/PVR.h"
             exit 1
@@ -136,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pvr.xtreamcodes-${{ steps.version.outputs.version }}-${{ matrix.label }}${{ matrix.arch && format('-{0}', matrix.arch) || '' }}
-          path: dist/*
+          path: dist/pvr.xtreamcodes-*.zip
 
       - name: Publish GitHub Release asset
         if: github.event_name == 'release'
@@ -161,7 +165,7 @@ jobs:
       - name: Fetch Kodi dev kit (headers)
         shell: bash
         run: |
-          git clone --depth 1 --branch 21.3-Omega https://github.com/xbmc/xbmc xbmc
+          git clone --depth 1 --branch 21.2-Omega https://github.com/xbmc/xbmc xbmc
           if [[ ! -f "xbmc/xbmc/addons/kodi-dev-kit/include/kodi/addon-instance/PVR.h" ]]; then
             echo "ERROR: Could not find kodi-dev-kit/include/kodi/addon-instance/PVR.h"
             exit 1
@@ -189,13 +193,10 @@ jobs:
             exit 1
           fi
           export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-21"
-          if [[ -n "$VERSION" ]]; then
-            VERSION="${VERSION#v}"  # Strip 'v' prefix
-            ./build.sh --skip-zip --version "$VERSION"
-          else
-            ./build.sh --skip-zip
-          fi
-          ls -lah dist
+          if [[ -z "$VERSION" ]]; then VERSION="1.1.0"; fi
+          VERSION="${VERSION#v}"  # Strip 'v' prefix
+          PLATFORM_SUFFIX="android-${{ matrix.abi }}" ./build.sh --version "$VERSION"
+          ls -lah dist/*.zip
 
       - name: Set version
         id: version
@@ -224,7 +225,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pvr.xtreamcodes-${{ steps.version.outputs.version }}-android-${{ matrix.abi }}
-          path: dist/*
+          path: dist/pvr.xtreamcodes-*.zip
 
       - name: Publish GitHub Release asset
         if: github.event_name == 'release'

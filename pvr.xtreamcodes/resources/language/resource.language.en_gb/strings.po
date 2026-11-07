@@ -2,6 +2,10 @@ msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 
+msgctxt "#30020"
+msgid "Refresh channel list now"
+msgstr "Refresh channel list now"
+
 msgctxt "#30000"
 msgid "Connection"
 msgstr "Connection"

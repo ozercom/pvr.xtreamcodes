@@ -103,7 +103,7 @@
 
         <setting id="filter_channel_separators" type="boolean" label="30208" help="">
           <level>0</level>
-          <default>true</default>
+          <default>false</default>
           <control type="toggle" />
         </setting>
 
