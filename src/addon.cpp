@@ -649,7 +649,10 @@ private:
 
     std::string blob;
     if (!ReadFileToString(path, blob))
+    {
+      kodi::Log(ADDON_LOG_WARNING, "pvr.xtreamcodes: cache file unavailable (%s)", path.c_str());
       return false;
+    }
 
     size_t off = 0;
     uint32_t magic = 0;
@@ -661,8 +664,22 @@ private:
       return false;
     const std::string sigOnDisk = blob.substr(off, sigLen);
     off += sigLen;
-    if (sigOnDisk != signature)
+
+    // Cache identity is the Xtream account, not presentation/filter preferences.
+    // Older builds included stream format, numbering and filters in the signature;
+    // changing a default (notably separator visibility) must not discard a valid
+    // channel cache and force a provider category request at startup.
+    const auto accountIdentity = [](const std::string& value) {
+      const size_t separator = value.find("|fmt=");
+      return value.substr(0, separator);
+    };
+    if (accountIdentity(sigOnDisk) != accountIdentity(signature))
+    {
+      kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: cache account identity does not match current settings");
       return false;
+    }
+    if (sigOnDisk != signature)
+      kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: using account cache despite changed display/filter preferences");
 
     uint64_t ts = 0;
     if (!ReadU64(blob, off, ts))
@@ -813,7 +830,10 @@ private:
       blob.append(c.name);
     }
 
-    (void)WriteStringToFileAtomic(path, blob);
+    const bool saved = WriteStringToFileAtomic(path, blob);
+    kodi::Log(saved ? ADDON_LOG_INFO : ADDON_LOG_ERROR,
+              "pvr.xtreamcodes: cache write %s (%zu channels) at %s",
+              saved ? "succeeded" : "FAILED", cacheChannels.size(), path.c_str());
   }
   void StartWorkerThread()
   {
