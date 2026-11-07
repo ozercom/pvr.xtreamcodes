@@ -337,17 +337,22 @@ public:
   {
     kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: instance created");
     AddMenuHook(kodi::addon::PVRMenuhook(1, 30020, PVR_MENUHOOK_SETTING));
-    StartBootstrapThread();
+    AddMenuHook(kodi::addon::PVRMenuhook(2, 30021, PVR_MENUHOOK_CHANNEL));
   }
 
   ~CXtreamCodesPVRClient() override
   {
     m_stopRequested = true;
     m_cv.notify_all();
-    if (m_bootstrap.joinable())
-      m_bootstrap.join();
     if (m_worker.joinable())
       m_worker.join();
+  }
+
+  void Initialize()
+  {
+    // Called by CreateInstance only after Kodi's persisted settings have been read.
+    // Cache loading is local and synchronous, so the first PVR channel query sees it.
+    EnsureLoaded();
   }
 
   void SetSettingsOverride(const xtream::Settings& settings)
@@ -413,6 +418,17 @@ public:
   PVR_ERROR CallSettingsMenuHook(const kodi::addon::PVRMenuhook& menuhook) override
   {
     if (menuhook.GetHookId() != 1)
+      return PVR_ERROR_NOT_IMPLEMENTED;
+    RequestReloadNow();
+    kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, "Manual channel refresh started");
+    return PVR_ERROR_NO_ERROR;
+  }
+
+  PVR_ERROR CallChannelMenuHook(const kodi::addon::PVRMenuhook& menuhook,
+                                const kodi::addon::PVRChannel& item) override
+  {
+    (void)item;
+    if (menuhook.GetHookId() != 2)
       return PVR_ERROR_NOT_IMPLEMENTED;
     RequestReloadNow();
     kodi::QueueNotification(QUEUE_INFO, ADDON_NAME, "Manual channel refresh started");
@@ -1215,35 +1231,13 @@ private:
     });
   }
 
-  void StartBootstrapThread()
-  {
-    // Kodi can create the PVR instance before settings are fully available.
-    // Ensure we attempt to load once credentials become readable.
-    if (m_bootstrap.joinable())
-      m_bootstrap.join();
-
-    m_bootstrap = std::thread([this]() {
-      // Try for a short window after startup; stop once loading begins.
-      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
-      while (!m_stopRequested && std::chrono::steady_clock::now() < deadline)
-      {
-        EnsureLoaded();
-
-        bool done = false;
-        {
-          std::lock_guard<std::mutex> lock(m_mutex);
-          done = m_loading || m_dataLoaded;
-        }
-        if (done)
-          return;
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(750));
-      }
-    });
-  }
-
   void EnsureLoaded()
   {
+    // Serialize first-load/cache decisions: Kodi may call several PVR callbacks
+    // concurrently during startup. This path performs only local cache I/O;
+    // network requests are always delegated to the worker thread.
+    std::lock_guard<std::mutex> ensureLock(m_ensureMutex);
+
     // Never block Kodi UI/PVR thread on a large HTTP+parse operation.
     // Instead, schedule a background load if needed and serve cached data (or 0) meanwhile.
 
@@ -1296,7 +1290,7 @@ private:
     std::string filterRaw;
     kodi::addon::GetSettingString("channel_filter_patterns", filterRaw);
 
-    bool filterChannelSeparators = true;
+    bool filterChannelSeparators = false;
     kodi::addon::GetSettingBoolean("filter_channel_separators", filterChannelSeparators);
 
     std::string categoryFilterMode;
@@ -1332,6 +1326,8 @@ private:
           categoryFilterMode = tmp;
         if (ExtractSettingValue(xml, "category_filter_patterns", tmp))
           categoryFilterRaw = tmp;
+        if (ExtractSettingValue(xml, "filter_channel_separators", tmp))
+          filterChannelSeparators = (ToLower(tmp) == "true" || tmp == "1");
       }
     }
 
@@ -1416,9 +1412,9 @@ private:
   }
 
   std::mutex m_mutex;
+  std::mutex m_ensureMutex;
   std::condition_variable m_cv;
   std::thread m_worker;
-  std::thread m_bootstrap;
   std::atomic<bool> m_stopRequested{false};
   std::atomic<uint64_t> m_generation{0};
   std::atomic<int64_t> m_lastRefreshTriggerMs{0};
@@ -1537,21 +1533,10 @@ public:
       // doesn't read empty values during early startup.
       const xtream::Settings s = m_hasCachedSettings ? m_cachedSettings : xtream::LoadSettings();
       m_pvrClient->SetSettingsOverride(s);
-
-      // If settings are already valid on disk, trigger an initial refresh so
-      // Kodi calls into the client and the loader starts automatically at boot.
-      auto haveMinCredentials = [](const xtream::Settings& st) -> bool {
-        if (Trim(st.server).empty() || Trim(st.username).empty() || Trim(st.password).empty())
-          return false;
-        if (st.port <= 0 || st.port > 65535)
-          return false;
-        return true;
-      };
-      if (haveMinCredentials(s))
-      {
-        m_pvrClient->TriggerChannelUpdate();
-        m_pvrClient->TriggerChannelGroupsUpdate();
-      }
+      // Load the local cache now, after settings are available and before Kodi's
+      // first channel enumeration. If there is no cache, EnsureLoaded schedules
+      // the provider fetch on the background worker and refreshes Kodi on success.
+      m_pvrClient->Initialize();
       return ADDON_STATUS_OK;
     }
     return ADDON_STATUS_NOT_IMPLEMENTED;
