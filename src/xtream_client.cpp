@@ -681,37 +681,55 @@ namespace xtream
 Settings LoadSettings()
 {
   Settings s;
-  kodi::addon::GetSettingString("server", s.server);
-  kodi::addon::GetSettingInt("port", s.port);
-  kodi::addon::GetSettingString("username", s.username);
-  kodi::addon::GetSettingString("password", s.password);
-  kodi::addon::GetSettingInt("timeout_seconds", s.timeoutSeconds);
-  kodi::addon::GetSettingBoolean("enable_user_agent_spoofing", s.enableUserAgentSpoofing);
-  kodi::addon::GetSettingString("custom_user_agent", s.customUserAgent);
+  const bool haveServer = kodi::addon::GetSettingString("server", s.server);
+  int kodiPort = 0;
+  const bool havePort = kodi::addon::GetSettingInt("port", kodiPort);
+  if (havePort && kodiPort > 0 && kodiPort <= 65535)
+    s.port = kodiPort;
+  else
+    s.port = 0; // Distinguish a missing Kodi value from the struct's default port.
 
-  // Kodi sometimes doesn't transfer settings to binary addons early during startup.
-  // Fall back to reading the persisted settings.xml from addon_data.
-  if (Trim(s.server).empty() || Trim(s.username).empty() || Trim(s.password).empty())
+  const bool haveUsername = kodi::addon::GetSettingString("username", s.username);
+  const bool havePassword = kodi::addon::GetSettingString("password", s.password);
+  const bool haveTimeout = kodi::addon::GetSettingInt("timeout_seconds", s.timeoutSeconds);
+  const bool haveSpoofing = kodi::addon::GetSettingBoolean("enable_user_agent_spoofing", s.enableUserAgentSpoofing);
+  const bool haveCustomUserAgent = kodi::addon::GetSettingString("custom_user_agent", s.customUserAgent);
+
+  // Read the persisted settings independently of the credential fallback. Kodi may
+  // provide server/user values while the port is still unavailable to the binary addon.
+  std::string xml;
+  if (ReadVfsTextFile("special://profile/addon_data/pvr.xtreamcodes/settings.xml", xml))
   {
-    std::string xml;
-    if (ReadVfsTextFile("special://profile/addon_data/pvr.xtreamcodes/settings.xml", xml))
+    std::string tmp;
+    int xmlPort = 0;
+    if (ExtractSettingInt(xml, "port", xmlPort) && xmlPort > 0 && xmlPort <= 65535)
     {
-      std::string tmp;
-      if (Trim(s.server).empty() && ExtractSettingValue(xml, "server", tmp))
-        s.server = tmp;
-      if ((s.port <= 0 || s.port > 65535))
-        ExtractSettingInt(xml, "port", s.port);
-      if (Trim(s.username).empty() && ExtractSettingValue(xml, "username", tmp))
-        s.username = tmp;
-      if (Trim(s.password).empty() && ExtractSettingValue(xml, "password", tmp))
-        s.password = tmp;
-      if (s.timeoutSeconds <= 0)
-        ExtractSettingInt(xml, "timeout_seconds", s.timeoutSeconds);
-      ExtractSettingBool(xml, "enable_user_agent_spoofing", s.enableUserAgentSpoofing);
-      if (ExtractSettingValue(xml, "custom_user_agent", tmp))
-        s.customUserAgent = tmp;
+      // A missing Kodi value must never silently turn a configured non-default port
+      // into port 80. Also prefer the persisted non-default port if Kodi reports its
+      // schema default during early addon initialization.
+      if (!havePort || s.port <= 0 || (s.port == 80 && xmlPort != 80))
+        s.port = xmlPort;
     }
+
+    if ((!haveServer || Trim(s.server).empty()) && ExtractSettingValue(xml, "server", tmp))
+      s.server = tmp;
+    if ((!haveUsername || Trim(s.username).empty()) && ExtractSettingValue(xml, "username", tmp))
+      s.username = tmp;
+    if ((!havePassword || Trim(s.password).empty()) && ExtractSettingValue(xml, "password", tmp))
+      s.password = tmp;
+    if ((!haveTimeout || s.timeoutSeconds <= 0))
+      ExtractSettingInt(xml, "timeout_seconds", s.timeoutSeconds);
+    if (!haveSpoofing)
+      ExtractSettingBool(xml, "enable_user_agent_spoofing", s.enableUserAgentSpoofing);
+    if (!haveCustomUserAgent || s.customUserAgent.empty())
+      ExtractSettingValue(xml, "custom_user_agent", s.customUserAgent);
   }
+
+  // Keep the historical default only when neither Kodi nor settings.xml supplied
+  // a valid port.
+  if (s.port <= 0 || s.port > 65535)
+    s.port = 80;
+
   return s;
 }
 
