@@ -1,0 +1,11 @@
+name: Actions diagnostic probe
+on:
+  push:
+    branches:
+      - kodi-21.2-no-epg-scan-fix
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm runner starts
+        run: echo "GitHub Actions runner started successfully"
