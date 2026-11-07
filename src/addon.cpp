@@ -824,7 +824,7 @@ private:
         std::string filterRaw;
         std::string categoryFilterMode;
         std::string categoryFilterRaw;
-        bool filterChannelSeparators = true;
+        bool filterChannelSeparators = false;
 
         {
           std::unique_lock<std::mutex> lock(m_mutex);
@@ -1437,7 +1437,7 @@ private:
   std::string m_filterPatternsRaw;
   std::string m_categoryFilterMode;
   std::string m_categoryFilterPatternsRaw;
-  bool m_filterChannelSeparators = true;
+  bool m_filterChannelSeparators = false;
   bool m_warnedMissingCreds = false;
   using ChannelList = std::vector<kodi::addon::PVRChannel>;
   using UidToStreamMap = std::unordered_map<unsigned int, int>;
