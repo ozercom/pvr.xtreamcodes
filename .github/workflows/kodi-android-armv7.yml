@@ -31,6 +31,9 @@ jobs:
 
       - name: Install Android SDK and NDK
         uses: android-actions/setup-android@v3
+        with:
+          # Avoid setup-android@v3's obsolete default 'tools' package.
+          packages: ''
       - name: Install SDK packages
         run: |
           yes | sdkmanager --licenses >/dev/null
