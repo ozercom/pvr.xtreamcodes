@@ -1,6 +1,7 @@
 name: Custom Kodi 21.2 Android ARMv7 build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - kodi-21.2-no-epg-scan-fix
