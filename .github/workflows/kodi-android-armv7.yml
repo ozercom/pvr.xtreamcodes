@@ -104,3 +104,5 @@ jobs:
           path: out/*.apk
           if-no-files-found: error
           retention-days: 14
+
+# Trigger rebuild after repository Actions permissions were enabled.
