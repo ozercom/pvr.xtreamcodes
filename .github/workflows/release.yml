@@ -193,9 +193,13 @@ jobs:
             exit 1
           fi
           export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-21"
-          if [[ -z "$VERSION" ]]; then VERSION="1.1.6"; fi
           VERSION="${VERSION#v}"  # Strip 'v' prefix
-          PLATFORM_SUFFIX="android-${{ matrix.abi }}" ./build.sh --version "$VERSION"
+          if [[ -n "$VERSION" ]]; then
+            PLATFORM_SUFFIX="android-${{ matrix.abi }}" ./build.sh --version "$VERSION"
+          else
+            # Use ADDON_VERSION from CMakeLists.txt for development builds.
+            PLATFORM_SUFFIX="android-${{ matrix.abi }}" ./build.sh
+          fi
           ls -lah dist/*.zip
 
       - name: Set version
