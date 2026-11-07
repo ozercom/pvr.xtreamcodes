@@ -10,8 +10,13 @@
 #include <cstdint>
 #include <condition_variable>
 #include <cstdio>
-#include <filesystem>
 #include <fstream>
+#ifdef _WIN32
+#include <filesystem>
+#else
+#include <cerrno>
+#include <sys/stat.h>
+#endif
 #include <memory>
 #include <mutex>
 #include <string>
@@ -171,12 +176,53 @@ bool ReadFileToString(const std::string& path, std::string& out)
   return f.good();
 }
 
+#ifndef _WIN32
+bool EnsureParentDirectories(const std::string& filePath)
+{
+  const size_t lastSlash = filePath.find_last_of('/');
+  if (lastSlash == std::string::npos || lastSlash == 0)
+    return true;
+
+  const std::string parent = filePath.substr(0, lastSlash);
+  std::string current;
+  size_t pos = 0;
+  if (!parent.empty() && parent.front() == '/')
+  {
+    current = "/";
+    pos = 1;
+  }
+
+  while (pos < parent.size())
+  {
+    const size_t next = parent.find('/', pos);
+    const std::string part = parent.substr(pos, next == std::string::npos ? std::string::npos : next - pos);
+    if (!part.empty())
+    {
+      if (!current.empty() && current.back() != '/')
+        current.push_back('/');
+      current += part;
+      if (mkdir(current.c_str(), 0777) != 0 && errno != EEXIST)
+        return false;
+    }
+    if (next == std::string::npos)
+      break;
+    pos = next + 1;
+  }
+  return true;
+}
+#endif
+
 bool WriteStringToFileAtomic(const std::string& path, const std::string& data)
 {
   try
   {
+#ifdef _WIN32
     const std::filesystem::path p(path);
     std::filesystem::create_directories(p.parent_path());
+#else
+    if (!EnsureParentDirectories(path))
+      return false;
+#endif
     const std::string tmp = path + ".tmp";
     {
       std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
@@ -186,17 +232,25 @@ bool WriteStringToFileAtomic(const std::string& path, const std::string& data)
       if (!f.good())
         return false;
     }
+#ifdef _WIN32
     std::error_code ec;
     std::filesystem::rename(tmp, path, ec);
     if (ec)
     {
-      // Fallback for platforms where rename over existing isn't atomic.
       std::filesystem::remove(path, ec);
       ec.clear();
       std::filesystem::rename(tmp, path, ec);
       if (ec)
         return false;
     }
+#else
+    // POSIX rename replaces an existing file atomically on the same filesystem.
+    if (std::rename(tmp.c_str(), path.c_str()) != 0)
+    {
+      std::remove(tmp.c_str());
+      return false;
+    }
+#endif
     return true;
   }
   catch (...)
