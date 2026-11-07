@@ -1,0 +1,15 @@
+diff --git a/xbmc/pvr/epg/Epg.cpp b/xbmc/pvr/epg/Epg.cpp
+--- a/xbmc/pvr/epg/Epg.cpp
++++ b/xbmc/pvr/epg/Epg.cpp
+@@ -406,8 +406,12 @@ bool CPVREpg::UpdateFromScraper(time_t start, time_t end, bool bForceUpdate)
+       if (!client->GetClientCapabilities().SupportsEPG())
+       {
+-        CLog::LogF(LOGERROR, "The backend for channel '{}' on client '{}' does not support EPGs",
++        CLog::LogF(LOGDEBUG, "Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs",
+                    m_channelData->ChannelName(), m_channelData->ClientId());
++        // Treat an unsupported EPG capability as a successful no-op. This avoids
++        // repeatedly failing the EPG scan for every channel of an IPTV client
++        // that intentionally does not provide EPG data.
++        return true;
+       }
+       else if (!bForceUpdate && client->GetClientCapabilities().SupportsAsyncEPGTransfer())
