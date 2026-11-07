@@ -1507,6 +1507,16 @@ public:
       return true;
     };
 
+    // Seed the cache from the complete persisted/Kodi settings before applying
+    // the first individual callback. Otherwise a callback for "server" or
+    // "username" can mark the cache complete while the separate port remains
+    // the struct default (80), even though settings.xml contains (for example) 8080.
+    if (!m_hasCachedSettings)
+    {
+      m_cachedSettings = xtream::LoadSettings();
+      m_hasCachedSettings = true;
+    }
+
     // Cache latest values as Kodi reports them, so actions (like Test connection)
     // can use the current UI values even if Kodi hasn't persisted them yet.
     if (settingName == "server")
@@ -1523,8 +1533,6 @@ public:
       m_cachedSettings.enableUserAgentSpoofing = settingValue.GetBoolean();
     else if (settingName == "custom_user_agent")
       m_cachedSettings.customUserAgent = settingValue.GetString();
-
-    m_hasCachedSettings = true;
 
     // Keep the active PVR instance in sync with the latest UI values so the loader
     // doesn't read stale/empty settings right after the user hits Test.
