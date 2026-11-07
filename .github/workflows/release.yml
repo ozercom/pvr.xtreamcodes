@@ -1,4 +1,4 @@
-name: Release Zips
+name: Release Zips and Android Builds
 
 on:
   push:
