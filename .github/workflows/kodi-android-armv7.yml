@@ -50,8 +50,22 @@ jobs:
 
           p = Path.home() / "kodi/xbmc/pvr/epg/Epg.cpp"
           source = p.read_text()
-          old = "      if (!client->GetClientCapabilities().SupportsEPG())\\n      {\\n        CLog::LogF(LOGERROR, \\"The backend for channel '{}' on client '{}' does not support EPGs\\",\\n                   m_channelData->ChannelName(), m_channelData->ClientId());\\n      }"
-          new = "      if (!client->GetClientCapabilities().SupportsEPG())\\n      {\\n        CLog::LogF(LOGDEBUG, \\"Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs\\",\\n                   m_channelData->ChannelName(), m_channelData->ClientId());\\n        // Unsupported EPG is a successful no-op; don't fail a scan for this backend.\\n        return true;\\n      }"
+          old = "\\n".join([
+              '      if (!client->GetClientCapabilities().SupportsEPG())',
+              '      {',
+              '        CLog::LogF(LOGERROR, "The backend for channel \'{}\' on client \'{}\' does not support EPGs",',
+              '                   m_channelData->ChannelName(), m_channelData->ClientId());',
+              '      }',
+          ])
+          new = "\\n".join([
+              '      if (!client->GetClientCapabilities().SupportsEPG())',
+              '      {',
+              '        CLog::LogF(LOGDEBUG, "Skipping EPG update for channel \'{}\' on client \'{}\': backend does not support EPGs",',
+              '                   m_channelData->ChannelName(), m_channelData->ClientId());',
+              '        // Unsupported EPG is a successful no-op; do not fail a scan for this backend.',
+              '        return true;',
+              '      }',
+          ])
 
           count = source.count(old)
           if count != 1:
