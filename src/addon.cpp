@@ -437,10 +437,25 @@ public:
     // for all channels, which would cause "backend does not support EPGs" errors in the log.
     // When this is false, Kodi will not attempt EPG updates for this addon's channels.
     capabilities.SetSupportsEPG(false);
+    kodi::Log(ADDON_LOG_INFO, "pvr.xtreamcodes: EPG support explicitly disabled");
 
     // We provide stream URLs and let Kodi handle playback.
     capabilities.SetHandlesInputStream(false);
     return PVR_ERROR_NO_ERROR;
+  }
+
+  // Hard guard: even if Kodi asks for guide data despite the disabled capability,
+  // this client never fetches or returns EPG data from Xtream Codes.
+  PVR_ERROR GetEPGForChannel(int channelUid,
+                             time_t start,
+                             time_t end,
+                             kodi::addon::PVREPGTagsResultSet& results) override
+  {
+    (void)channelUid;
+    (void)start;
+    (void)end;
+    (void)results;
+    return PVR_ERROR_NOT_IMPLEMENTED;
   }
 
   void TriggerKodiRefreshThrottled()

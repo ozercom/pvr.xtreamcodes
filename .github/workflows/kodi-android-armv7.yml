@@ -57,7 +57,7 @@ jobs:
           export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-21 -DANDROID_STL=c++_shared"
           PLATFORM_SUFFIX=android-armeabi-v7a ./build.sh --skip-zip
           test -s dist/pvr.xtreamcodes/pvr.xtreamcodes.android.so
-          grep -q 'version="1.1.7"' dist/pvr.xtreamcodes/addon.xml
+          grep -q 'version="1.1.8"' dist/pvr.xtreamcodes/addon.xml
 
       - name: Download official Kodi 21.2 ARMv7 APK
         run: |
@@ -101,7 +101,7 @@ jobs:
           unzip -Z1 out/Kodi-21.2-Ozer-ARMv7.apk | grep -q '^assets/addons/pvr.xtreamcodes/addon.xml$'
           unzip -Z1 out/Kodi-21.2-Ozer-ARMv7.apk | grep -q '^lib/armeabi-v7a/libpvr.xtreamcodes.android.so$'
 
-          (cd dist && zip -qr "$GITHUB_WORKSPACE/out/pvr.xtreamcodes-1.1.7-android-armeabi-v7a.zip" pvr.xtreamcodes)
+          (cd dist && zip -qr "$GITHUB_WORKSPACE/out/pvr.xtreamcodes-1.1.8-android-armeabi-v7a.zip" pvr.xtreamcodes)
 
       - name: Upload APK and addon ZIP
         uses: actions/upload-artifact@v4
