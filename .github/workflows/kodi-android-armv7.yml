@@ -50,14 +50,14 @@ jobs:
 
           p = Path.home() / "kodi/xbmc/pvr/epg/Epg.cpp"
           source = p.read_text()
-          old = "\\n".join([
+          old = "\n".join([
               '      if (!client->GetClientCapabilities().SupportsEPG())',
               '      {',
               '        CLog::LogF(LOGERROR, "The backend for channel \'{}\' on client \'{}\' does not support EPGs",',
               '                   m_channelData->ChannelName(), m_channelData->ClientId());',
               '      }',
           ])
-          new = "\\n".join([
+          new = "\n".join([
               '      if (!client->GetClientCapabilities().SupportsEPG())',
               '      {',
               '        CLog::LogF(LOGDEBUG, "Skipping EPG update for channel \'{}\' on client \'{}\': backend does not support EPGs",',
