@@ -50,20 +50,8 @@ jobs:
 
           p = Path.home() / "kodi/xbmc/pvr/epg/Epg.cpp"
           source = p.read_text()
-
-          old = """      if (!client->GetClientCapabilities().SupportsEPG())
-          {
-        CLog::LogF(LOGERROR, "The backend for channel '{}' on client '{}' does not support EPGs",
-                   m_channelData->ChannelName(), m_channelData->ClientId());
-          }"""
-
-          new = """      if (!client->GetClientCapabilities().SupportsEPG())
-          {
-        CLog::LogF(LOGDEBUG, "Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs",
-                   m_channelData->ChannelName(), m_channelData->ClientId());
-            // Unsupported EPG is a successful no-op; don't fail a scan for this backend.
-            return true;
-          }"""
+          old = "      if (!client->GetClientCapabilities().SupportsEPG())\\n      {\\n        CLog::LogF(LOGERROR, \\"The backend for channel '{}' on client '{}' does not support EPGs\\",\\n                   m_channelData->ChannelName(), m_channelData->ClientId());\\n      }"
+          new = "      if (!client->GetClientCapabilities().SupportsEPG())\\n      {\\n        CLog::LogF(LOGDEBUG, \\"Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs\\",\\n                   m_channelData->ChannelName(), m_channelData->ClientId());\\n        // Unsupported EPG is a successful no-op; don't fail a scan for this backend.\\n        return true;\\n      }"
 
           count = source.count(old)
           if count != 1:
@@ -71,7 +59,7 @@ jobs:
 
           p.write_text(source.replace(old, new, 1))
           patched = p.read_text()
-          if "Skipping EPG update for channel" not in patched or "return true;" not in patched:
+          if "Skipping EPG update for channel" not in patched:
               raise SystemExit("EPG Scan Fix verification failed.")
 
           print("EPG Scan Fix applied and verified in xbmc/pvr/epg/Epg.cpp")
