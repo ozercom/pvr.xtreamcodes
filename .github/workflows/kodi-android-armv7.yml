@@ -109,6 +109,6 @@ jobs:
           name: Kodi-21.2-Ozer-ARMv7
           path: |
             out/Kodi-21.2-Ozer-ARMv7.apk
-            out/pvr.xtreamcodes-1.1.7-android-armeabi-v7a.zip
+            out/pvr.xtreamcodes-1.1.8-android-armeabi-v7a.zip
           if-no-files-found: error
           retention-days: 14
