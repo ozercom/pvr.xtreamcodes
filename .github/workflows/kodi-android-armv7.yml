@@ -53,14 +53,14 @@ jobs:
 
           old = """      if (!client->GetClientCapabilities().SupportsEPG())
           {
-            CLog::LogF(LOGERROR, "The backend for channel '{}' on client '{}' does not support EPGs",
-                       m_channelData->ChannelName(), m_channelData->ClientId());
+        CLog::LogF(LOGERROR, "The backend for channel '{}' on client '{}' does not support EPGs",
+                   m_channelData->ChannelName(), m_channelData->ClientId());
           }"""
 
           new = """      if (!client->GetClientCapabilities().SupportsEPG())
           {
-            CLog::LogF(LOGDEBUG, "Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs",
-                       m_channelData->ChannelName(), m_channelData->ClientId());
+        CLog::LogF(LOGDEBUG, "Skipping EPG update for channel '{}' on client '{}': backend does not support EPGs",
+                   m_channelData->ChannelName(), m_channelData->ClientId());
             // Unsupported EPG is a successful no-op; don't fail a scan for this backend.
             return true;
           }"""
