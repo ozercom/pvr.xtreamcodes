@@ -53,7 +53,9 @@ def get_group_channels(group_id):
         'channelgroupid': group_id,
         'properties': ['channelid', 'label', 'channelnumber', 'icon', 'thumbnail', 'channeltype']
     })
-    return (result or {}).get('channels', [])
+    if result is None:
+        return None
+    return result.get('channels', [])
 
 
 def all_channels(force=False):
@@ -70,6 +72,9 @@ def all_channels(force=False):
     # Kodi's documented virtual group 'alltv' returns every TV channel
     # across all PVR groups in one request. This avoids slow per-group scans.
     channels = get_group_channels('alltv')
+    if channels is None:
+        xbmcgui.Dialog().notification('Kanal arama', 'Kodi PVR kanal listesi alınamadı', xbmcgui.NOTIFICATION_ERROR, 3000)
+        return []
     try:
         xbmcvfs.mkdirs(PROFILE)
         temp_file = CACHE_FILE + '.tmp'
@@ -128,6 +133,10 @@ def root():
 def show_group(group_id, group_name):
     xbmcplugin.setPluginCategory(HANDLE, group_name)
     channels = get_group_channels(group_id)
+    if channels is None:
+        xbmcgui.Dialog().notification('Kanal grubu', 'Grup kanalları alınamadı', xbmcgui.NOTIFICATION_ERROR, 3000)
+        xbmcplugin.endOfDirectory(HANDLE, succeeded=False)
+        return
     channels.sort(key=channel_sort_key)
     for channel in channels:
         channel['group_label'] = group_name
