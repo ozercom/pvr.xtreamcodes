@@ -18,6 +18,7 @@ jobs:
         run: python -m py_compile plugin.video.xtreamcodes.browser/default.py
       - name: Package Kodi script add-on
         run: |
+          rm -rf plugin.video.xtreamcodes.browser/__pycache__
           rm -f plugin.video.xtreamcodes.browser-0.1.0.zip
           zip -r plugin.video.xtreamcodes.browser-0.1.0.zip plugin.video.xtreamcodes.browser
           unzip -t plugin.video.xtreamcodes.browser-0.1.0.zip
