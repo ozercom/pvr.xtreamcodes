@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Validate Python syntax
+        run: python -m py_compile plugin.video.xtreamcodes.browser/default.py
       - name: Package Kodi script add-on
         run: |
           zip -r plugin.video.xtreamcodes.browser-0.1.0.zip plugin.video.xtreamcodes.browser
