@@ -49,6 +49,9 @@ def get_groups():
 
 
 def get_group_channels(group_id):
+    # URL query parameters are strings; Kodi expects numeric IDs as integers.
+    if str(group_id).isdigit():
+        group_id = int(group_id)
     result = rpc('PVR.GetChannels', {
         'channelgroupid': group_id,
         'properties': ['channelid', 'label', 'channelnumber', 'icon', 'thumbnail', 'channeltype']
