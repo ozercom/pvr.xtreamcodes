@@ -1,6 +1,7 @@
 name: Build Xtream Codes Kodi 21.2 Android ARMv7 ZIP
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - kodi-21.2-no-epg-scan-fix
