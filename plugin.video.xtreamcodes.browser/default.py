@@ -69,7 +69,7 @@ def all_channels(force=False):
 
     # Kodi's documented virtual group 'alltv' returns every TV channel
     # across all PVR groups in one request. This avoids slow per-group scans.
-    channels = get_group_channels('alltv')    channels = list(found.values())
+    channels = get_group_channels('alltv')
     try:
         xbmcvfs.mkdirs(PROFILE)
         temp_file = CACHE_FILE + '.tmp'
