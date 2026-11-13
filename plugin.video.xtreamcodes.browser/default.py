@@ -50,7 +50,7 @@ def get_groups():
 
 def get_group_channels(group_id):
     result = rpc('PVR.GetChannels', {
-        'channelgroupid': int(group_id),
+        'channelgroupid': group_id,
         'properties': ['channelid', 'label', 'channelnumber', 'icon', 'thumbnail', 'channeltype']
     })
     return (result or {}).get('channels', [])
@@ -67,20 +67,9 @@ def all_channels(force=False):
     except Exception as exc:
         xbmc.log('Xtream Browser cache read failed: %s' % exc, xbmc.LOGWARNING)
 
-    groups = get_groups()
-    found = {}
-    for group in groups:
-        group_id = group.get('channelgroupid')
-        if group_id is None:
-            continue
-        for channel in get_group_channels(group_id):
-            channel_id = channel.get('channelid')
-            if channel_id is None or channel_id in found:
-                continue
-            channel['group_label'] = group.get('label', '')
-            found[channel_id] = channel
-
-    channels = list(found.values())
+    # Kodi's documented virtual group 'alltv' returns every TV channel
+    # across all PVR groups in one request. This avoids slow per-group scans.
+    channels = get_group_channels('alltv')    channels = list(found.values())
     try:
         xbmcvfs.mkdirs(PROFILE)
         temp_file = CACHE_FILE + '.tmp'
