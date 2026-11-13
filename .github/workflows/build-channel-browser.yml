@@ -1,0 +1,27 @@
+name: Build Xtream channel browser
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/global-channel-search-and-group-navigation
+    paths:
+      - 'plugin.video.xtreamcodes.browser/**'
+      - '.github/workflows/build-channel-browser.yml'
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Package Kodi script add-on
+        run: |
+          zip -r plugin.video.xtreamcodes.browser-0.1.0.zip plugin.video.xtreamcodes.browser
+          unzip -t plugin.video.xtreamcodes.browser-0.1.0.zip
+          test -f plugin.video.xtreamcodes.browser/addon.xml
+      - name: Upload installable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin.video.xtreamcodes.browser-0.1.0
+          path: plugin.video.xtreamcodes.browser-0.1.0.zip
+          if-no-files-found: error
