@@ -36,11 +36,12 @@ jobs:
 
       - name: Build Android ARMv7 addon and installable ZIP
         env:
-          KODI_ADDON_SDK: ${{ '$' }}HOME/kodi/xbmc/addons/kodi-dev-kit
           VERSION: 1.1.9
           PLATFORM_SUFFIX: android-armeabi-v7a
         run: |
           set -euo pipefail
+          # Expand HOME in the shell. GitHub Actions env values do not expand $HOME.
+          export KODI_ADDON_SDK="$HOME/kodi/xbmc/addons/kodi-dev-kit"
           export CMAKE_EXTRA_ARGS="-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-21"
           ./build.sh --version "$VERSION"
           test -s dist/pvr.xtreamcodes-1.1.9-android-armeabi-v7a.zip
